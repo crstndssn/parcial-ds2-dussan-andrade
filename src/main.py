@@ -1,44 +1,23 @@
-import os
-
 from pymongo import MongoClient
-
 from modelo import CampanaPruebas
 
-MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017/")
+cliente = MongoClient("mongodb://localhost:27017/")
+db = cliente["huilasoft"]
 
-def leer_datos():
-    cliente = MongoClient(MONGO_URI, serverSelectionTimeoutMS=3000)
-    db = cliente["matriculapp"]
+defectos = []
+for doc in db.defectos_semanales.find().sort("semana", 1):
+    defectos.append(doc["defectos"])
 
-    semanas = []
-    defectos = []
-    for doc in db.defectos_semanales.find({"version": "1.0"}):
-        semanas.append(doc["semana"])
-        defectos.append(doc["defectos"])
-    
-    cliente.close()
-    return semanas, defectos
+print("defectos por semana:", defectos)
 
-def main():
-    # leer mongo
-    semanas, defectos = leer_datos()
-    print("semanas: ", semanas)
-    print("defectos: ", defectos)
-    print()
+campana = CampanaPruebas(defectos)
+a, b = campana.ajustar()
 
-    #crear el objeto y ajustar el modelo
-    campana = CampanaPruebas(semanas, defectos)
-    a, b = campana.ajustar()
-    print(f"modelo: d(t) = {a:.2f} * e^({b:.4f} * t)")
-    print()
+print("Acumulados:", campana.acumulados)
+print("a =", round(a, 2))
+print("b =", round(b, 4))
+print("defectos sin descubrir:", round(campana.restantes(), 1))
+print("semana del 95%:", round(campana.semana_95(), 1))
 
-    # predicción
-    print(f"defectos esperados semnana 9: {campana.predecir(9):.1f}")
-    print(f"defectos esperados semnana 10: {campana.predecir(10):.1f}")
-
-    #grafica
-    ruta = campana.graficar('graficas/resultado.png')
-    print(f"grafica guardada en {ruta}")
-
-    if __name__ == "__main__":
-        main()
+campana.graficar("graficas/resultado.png")
+print("grafica guardada")
